@@ -1,173 +1,174 @@
-import { useState } from 'react'
-import { Button } from '@/components/ui/button.jsx'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
-import { ThumbsUp, ThumbsDown, Star, MessageCircle, Eye, MoreHorizontal } from 'lucide-react'
+import React, { useState } from 'react'
 
-const ContentCard = ({ content, onRate, onComment, onView, compact = false }) => {
-  const [isLiked, setIsLiked] = useState(false)
-  const [showActions, setShowActions] = useState(false)
+const ContentCard = ({ content, onRate, onComment }) => {
+  const [imageError, setImageError] = useState(false)
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+  const [showCommentForm, setShowCommentForm] = useState(false)
+
+  const handleImageError = () => {
+    setImageError(true)
+  }
+
+  const handleRate = (newRating) => {
+    setRating(newRating)
+    if (onRate) {
+      onRate(content.id, newRating)
+    }
+  }
+
+  const handleComment = () => {
+    if (comment.trim() && onComment) {
+      onComment(content.id, comment)
+      setComment('')
+      setShowCommentForm(false)
+    }
+  }
 
   const getTypeColor = (type) => {
-    switch (type) {
-      case 'trend': return 'bg-blue-100 text-blue-800'
-      case 'technology': return 'bg-green-100 text-green-800'
-      case 'inspiration': return 'bg-purple-100 text-purple-800'
-      default: return 'bg-gray-100 text-gray-800'
+    const colors = {
+      technology: 'bg-blue-100 text-blue-800',
+      trend: 'bg-green-100 text-green-800',
+      inspiration: 'bg-purple-100 text-purple-800',
+      innovation: 'bg-orange-100 text-orange-800'
     }
+    return colors[type] || 'bg-gray-100 text-gray-800'
   }
 
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-    if (onRate) {
-      onRate(content.id, isLiked ? 4 : 5) // Simple like/unlike rating
+  const getTimeHorizonColor = (horizon) => {
+    const colors = {
+      short: 'bg-red-100 text-red-800',
+      medium: 'bg-yellow-100 text-yellow-800',
+      long: 'bg-green-100 text-green-800'
     }
+    return colors[horizon] || 'bg-gray-100 text-gray-800'
   }
 
-  if (compact) {
-    return (
-      <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView && onView(content)}>
-        <CardContent className="p-4">
-          <div className="flex items-start space-x-3">
-            {content.image_url && (
-              <img 
-                src={content.image_url} 
-                alt={content.title}
-                className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-1">
-                <Badge className={getTypeColor(content.content_type)}>
-                  {content.content_type}
-                </Badge>
-                {content.industry && (
-                  <Badge variant="outline" className="text-xs">
-                    {content.industry}
-                  </Badge>
-                )}
-              </div>
-              <h3 className="font-semibold text-sm truncate">{content.title}</h3>
-              <p className="text-xs text-gray-600 line-clamp-2 mt-1">
-                {content.short_description}
-              </p>
-              <div className="flex items-center space-x-3 mt-2 text-xs text-gray-500">
-                <span className="flex items-center">
-                  <Star className="h-3 w-3 mr-1" />
-                  {content.average_rating?.toFixed(1) || '0.0'}
-                </span>
-                <span className="flex items-center">
-                  <MessageCircle className="h-3 w-3 mr-1" />
-                  {content.comment_count || 0}
-                </span>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
+  const renderStars = (rating, interactive = false) => {
+    return [...Array(5)].map((_, i) => (
+      <span
+        key={i}
+        className={`cursor-pointer text-lg ${
+          i < rating ? 'text-yellow-400' : 'text-gray-300'
+        } ${interactive ? 'hover:text-yellow-400' : ''}`}
+        onClick={interactive ? () => handleRate(i + 1) : undefined}
+      >
+        ★
+      </span>
+    ))
   }
 
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-2">
-            <Badge className={getTypeColor(content.content_type)}>
-              {content.content_type}
-            </Badge>
-            {content.industry && (
-              <Badge variant="outline">
-                {content.industry}
-              </Badge>
-            )}
-            {content.time_horizon && (
-              <Badge variant="secondary">
-                {content.time_horizon} term
-              </Badge>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowActions(!showActions)}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
-        <CardTitle className="text-lg">{content.title}</CardTitle>
-        {content.creator_username && (
-          <CardDescription>
-            by {content.creator_username} • {new Date(content.created_at).toLocaleDateString()}
-          </CardDescription>
-        )}
-      </CardHeader>
-
-      {content.image_url && (
-        <div className="px-6">
-          <img 
-            src={content.image_url} 
+    <div className="content-card card-hover">
+      {/* Image Section */}
+      <div className="mb-4">
+        {!imageError && content.image_url ? (
+          <img
+            src={content.image_url}
             alt={content.title}
-            className="w-full h-48 object-cover rounded-lg"
+            className="content-image"
+            onError={handleImageError}
           />
+        ) : (
+          <div className="content-image">
+            <div className="text-center">
+              <div className="text-2xl mb-2">🏢</div>
+              <div>Bild nicht verfügbar</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Content Header */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(content.content_type)}`}>
+          {content.content_type}
+        </span>
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getTimeHorizonColor(content.time_horizon)}`}>
+          {content.time_horizon} term
+        </span>
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          {content.industry}
+        </span>
+      </div>
+
+      {/* Title and Description */}
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        {content.title}
+      </h3>
+      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+        {content.short_description}
+      </p>
+
+      {/* Creator and Date */}
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+        <span>by {content.creator_username}</span>
+        <span>{new Date(content.created_at).toLocaleDateString('de-DE')}</span>
+      </div>
+
+      {/* Rating Display */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex">
+          {renderStars(Math.round(content.average_rating || 0))}
+        </div>
+        <span className="text-sm text-gray-600">
+          {content.average_rating?.toFixed(1) || '0.0'} ({content.rating_count || 0})
+        </span>
+      </div>
+
+      {/* Interactive Rating */}
+      <div className="mb-4">
+        <div className="text-sm font-medium text-gray-700 mb-2">Ihre Bewertung:</div>
+        <div className="flex">
+          {renderStars(rating, true)}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setShowCommentForm(!showCommentForm)}
+          className="flex items-center gap-1 px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+        >
+          💬 Kommentar ({content.comment_count || 0})
+        </button>
+        
+        <button className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors">
+          👁️ Details
+        </button>
+        
+        <button className="flex items-center gap-1 px-3 py-1 text-sm bg-green-100 hover:bg-green-200 text-green-700 rounded-md transition-colors">
+          👍 Like
+        </button>
+      </div>
+
+      {/* Comment Form */}
+      {showCommentForm && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-md">
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Ihr Kommentar..."
+            className="w-full p-2 border border-gray-300 rounded-md text-sm resize-none"
+            rows="3"
+          />
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleComment}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Senden
+            </button>
+            <button
+              onClick={() => setShowCommentForm(false)}
+              className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-400 transition-colors"
+            >
+              Abbrechen
+            </button>
+          </div>
         </div>
       )}
-
-      <CardContent className="pt-4">
-        <p className="text-gray-700 mb-4">
-          {content.short_description}
-        </p>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant={isLiked ? "default" : "outline"}
-              size="sm"
-              onClick={handleLike}
-              className="flex items-center space-x-1"
-            >
-              <ThumbsUp className="h-4 w-4" />
-              <span>{isLiked ? 'Liked' : 'Like'}</span>
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onView && onView(content)}
-              className="flex items-center space-x-1"
-            >
-              <Eye className="h-4 w-4" />
-              <span>View Details</span>
-            </Button>
-          </div>
-
-          <div className="flex items-center space-x-4 text-sm text-gray-500">
-            <span className="flex items-center">
-              <Star className="h-4 w-4 mr-1" />
-              {content.average_rating?.toFixed(1) || '0.0'} ({content.rating_count || 0})
-            </span>
-            <span className="flex items-center">
-              <MessageCircle className="h-4 w-4 mr-1" />
-              {content.comment_count || 0}
-            </span>
-          </div>
-        </div>
-
-        {showActions && (
-          <div className="mt-4 pt-4 border-t flex space-x-2">
-            <Button variant="outline" size="sm" onClick={() => onComment && onComment(content)}>
-              Add Comment
-            </Button>
-            <Button variant="outline" size="sm">
-              Add to Playlist
-            </Button>
-            <Button variant="outline" size="sm">
-              Add to Opportunity Space
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    </div>
   )
 }
 
