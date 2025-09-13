@@ -1,0 +1,23 @@
+{
+  "name": "11_dre_inno_engine_manus",
+  "version": "1.0.0",
+  "description": "Ein vollständiger Prototyp einer Innovationsplattform für die Immobilienbranche mit Flask Backend und React Frontend.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "cd frontend && npm run dev",
+    "start": "python backend/app.py",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sbisi/Real-Estate-Innovation-Engine.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sbisi/Real-Estate-Innovation-Engine/issues"
+  },
+  "homepage": "https://github.com/sbisi/Real-Estate-Innovation-Engine#readme"
+}
