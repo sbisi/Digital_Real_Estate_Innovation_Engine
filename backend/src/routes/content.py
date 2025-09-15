@@ -56,6 +56,49 @@ def content_preview():
     data = _extract_meta(url)
     return jsonify(data), 200
 
+@content_bp.post('/content')
+def content_create_slim():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+
+        valid_types = {'trend', 'technology', 'inspiration'}
+        ctype = (data.get('type') or '').strip().lower()
+        if ctype not in valid_types:
+            return jsonify({'error': f'Invalid type. Must be one of {sorted(valid_types)}'}), 400
+
+        # Status: draft | approved
+        status = (data.get('status') or 'draft').strip().lower()
+        if status not in {'draft', 'approved'}:
+            return jsonify({'error': 'invalid status'}), 400
+
+        created_by = data.get('created_by')
+        user = None
+        if created_by is not None:
+            user = User.query.get(created_by)
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+        content = Content(
+            title=data.get('title'),
+            short_description=data.get('summary'),
+            long_description=None,
+            content_type=ctype,
+            image_url=data.get('image'),
+            created_by=(created_by if user else None),
+            industry=None,
+            time_horizon=None,
+            status=status
+        )
+
+        db.session.add(content)
+        db.session.commit()
+        return jsonify(content.to_dict()), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 # ============================================================
 # NEU: /api/content – schlanke Create-Route für AddConnectPage
 # Erwartet JSON:
