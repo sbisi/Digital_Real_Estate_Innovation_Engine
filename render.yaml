@@ -1,29 +1,36 @@
 services:
   - type: web
-    name: backend
+    name: rei-backend
     env: python
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port 10000
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash -lc 'mkdir -p src/database && exec gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT src.main:app'
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
-      - key: ENV
-        value: production
-    autoDeploy: true
-    rootDir: backend
+    # Persistente Files für SQLite
+    disk:
+      name: rei-db
+      mountPath: /opt/render/project/src/backend/src/database
+      sizeGB: 1
     healthCheckPath: /health
 
   - type: static
-    name: frontend
+    name: rei-frontend
     plan: free
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
+    # Frontend bekommt die Backend-URL automatisch als Env-Var
     envVars:
       - key: VITE_API_BASE_URL
         fromService:
           type: web
-          name: backend
-          property: host
-    pullRequestPreviewsEnabled: true
+          name: rei-backend
+          property: url
+    # SPA-Fallback
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
