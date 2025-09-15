@@ -67,6 +67,7 @@ function ManualForm() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    const status = e.nativeEvent?.submitter?.dataset?.status || "draft";
     setBusy(true);
     setMsg("");
 
@@ -77,6 +78,7 @@ function ManualForm() {
       tags: parseTags(tags),
       source_type: "manual",
       source_url: sourceUrl || null,
+      status, // <- NEU
     };
 
     try {
@@ -86,12 +88,8 @@ function ManualForm() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
-      setMsg("✅ Gespeichert");
-      setTitle("");
-      setSummary("");
-      setSourceUrl("");
-      setTags("");
-      setContentType("");
+      setMsg(status === "approved" ? "✅ Inhalt veröffentlicht" : "✅ Entwurf gespeichert");
+      setTitle(""); setSummary(""); setSourceUrl(""); setTags(""); setContentType("");
     } catch (err) {
       console.error(err);
       setMsg("❌ Speichern fehlgeschlagen");
@@ -166,10 +164,19 @@ function ManualForm() {
       <div className="flex items-center gap-3">
         <button
           type="submit"
+          data-status="draft"
           disabled={busy}
-          className="px-4 py-2 rounded bg-black text-white disabled:opacity-60"
+          className="px-4 py-2 rounded border text-black bg-white hover:bg-gray-100 disabled:opacity-60"
         >
-          {busy ? "Speichern…" : "Speichern"}
+          Als Entwurf speichern
+        </button>
+        <button
+          type="submit"
+          data-status="approved"
+          disabled={busy}
+          className="px-4 py-2 rounded bg-black text-white hover:opacity-90 disabled:opacity-60"
+        >
+          Inhalt hinzufügen
         </button>
         {msg && <p className="text-sm">{msg}</p>}
       </div>
@@ -206,6 +213,7 @@ function UrlForm() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    const status = e.nativeEvent?.submitter?.dataset?.status || "draft";
     setBusy(true);
     setMsg("");
     const payload = {
@@ -217,6 +225,7 @@ function UrlForm() {
       summary: preview?.description || null,
       image: preview?.image || null,
       site: preview?.site || null,
+      status, // <- NEU
     };
     try {
       const res = await fetch(`${API_BASE_URL}/content`, {
@@ -225,11 +234,8 @@ function UrlForm() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
-      setMsg("✅ Importiert");
-      setUrl("");
-      setTags("");
-      setContentType("");
-      setPreview(null);
+      setMsg(status === "approved" ? "✅ Inhalt veröffentlicht" : "✅ Entwurf gespeichert");
+      setUrl(""); setTags(""); setContentType(""); setPreview(null);
     } catch (err) {
       console.error(err);
       setMsg("❌ Import fehlgeschlagen");
@@ -298,8 +304,21 @@ function UrlForm() {
       )}
 
       <div className="flex items-center gap-3">
-        <button className="px-4 py-2 rounded bg-black text-white disabled:opacity-60" disabled={busy}>
-          {busy ? "Importieren…" : "Importieren"}
+        <button
+          type="submit"
+          data-status="draft"
+          disabled={busy}
+          className="px-4 py-2 rounded border text-black bg-white hover:bg-gray-100 disabled:opacity-60"
+        >
+          Als Entwurf speichern
+        </button>
+        <button
+          type="submit"
+          data-status="approved"
+          disabled={busy}
+          className="px-4 py-2 rounded bg-black text-white hover:opacity-90 disabled:opacity-60"
+        >
+          Inhalt hinzufügen
         </button>
         {msg && <p className="text-sm">{msg}</p>}
       </div>
@@ -314,10 +333,13 @@ function FileUploadForm() {
   const [tags, setTags] = useState("");
   const [progress, setProgress] = useState(0);
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    const status = e.nativeEvent?.submitter?.dataset?.status || "draft";
+
     const f = fileRef.current?.files?.[0];
     if (!f) {
       setMsg("❌ Bitte Datei wählen");
@@ -325,14 +347,15 @@ function FileUploadForm() {
     }
     setMsg("");
     setProgress(0);
+    setBusy(true);
 
     const fd = new FormData();
     fd.append("file", f);
     fd.append("type", contentType);
     fd.append("title", title);
     fd.append("tags", JSON.stringify(parseTags(tags)));
+    fd.append("status", status); // <- NEU
 
-    // Upload mit Fortschritt via XHR
     try {
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -342,20 +365,21 @@ function FileUploadForm() {
             setProgress(Math.round((evt.loaded / evt.total) * 100));
           }
         };
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(xhr.responseText));
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(xhr.responseText);
         xhr.onerror = reject;
         xhr.send(fd);
       });
-      setMsg("✅ Upload erfolgreich");
+      setMsg(status === "approved" ? "✅ Datei veröffentlicht" : "✅ Entwurf gespeichert");
       setProgress(0);
       if (fileRef.current) fileRef.current.value = "";
-      setTitle("");
-      setTags("");
-      setContentType("");
+      setTitle(""); setTags(""); setContentType("");
     } catch (err) {
       console.error(err);
       setMsg("❌ Upload fehlgeschlagen");
       setProgress(0);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -415,7 +439,22 @@ function FileUploadForm() {
       )}
 
       <div className="flex items-center gap-3">
-        <button className="px-4 py-2 rounded bg-black text-white">Hochladen</button>
+        <button
+          type="submit"
+          data-status="draft"
+          disabled={busy}
+          className="px-4 py-2 rounded border text-black bg-white hover:bg-gray-100 disabled:opacity-60"
+        >
+          Als Entwurf speichern
+        </button>
+        <button
+          type="submit"
+          data-status="approved"
+          disabled={busy}
+          className="px-4 py-2 rounded bg-black text-white hover:opacity-90 disabled:opacity-60"
+        >
+          Inhalt hinzufügen
+        </button>
         {msg && <p className="text-sm">{msg}</p>}
       </div>
     </form>
