@@ -1,4 +1,5 @@
 services:
+  # Backend (Flask)
   - type: web
     name: rei-backend
     runtime: python
@@ -11,19 +12,21 @@ services:
         value: "3.11"
     healthCheckPath: /health
 
+  # Frontend (Vite/React) als Static Site — KEIN plan-Feld!
   - type: web
     name: rei-frontend
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
+      # Holt die öffentliche URL des Backends als API-Base
       - key: VITE_API_BASE_URL
         fromService:
           name: rei-backend
           type: web
           envVarKey: RENDER_EXTERNAL_URL
+    # SPA-Fallback für Client-Routing
     routes:
       - type: rewrite
         source: /*
