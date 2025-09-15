@@ -56,6 +56,63 @@ def content_preview():
     data = _extract_meta(url)
     return jsonify(data), 200
 
+@content_bp.post('/content/upload')
+def content_upload():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'file missing'}), 400
+        f = request.files['file']
+        if not f.filename:
+            return jsonify({'error': 'empty filename'}), 400
+
+        ctype = (request.form.get('type') or '').strip().lower()
+        if ctype not in {'trend', 'technology', 'inspiration'}:
+            return jsonify({'error': 'invalid type'}), 400
+
+        # Status aus Formular
+        status = (request.form.get('status') or 'draft').strip().lower()
+        if status not in {'draft', 'approved'}:
+            return jsonify({'error': 'invalid status'}), 400
+
+        title = (request.form.get('title') or '').strip()
+        created_by = request.form.get('created_by')
+        user = None
+        if created_by is not None:
+            try:
+                created_by_int = int(created_by)
+                user = User.query.get(created_by_int)
+                if not user:
+                    return jsonify({'error': 'User not found'}), 404
+            except ValueError:
+                return jsonify({'error': 'created_by must be integer'}), 400
+
+        upload_dir = pathlib.Path(os.getenv('DATA_DIR', '/tmp')) / 'uploads'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        filename = secure_filename(f.filename)
+        save_path = upload_dir / filename
+        f.save(save_path)
+
+        content = Content(
+            title=title or filename,
+            short_description=None,
+            long_description=None,
+            content_type=ctype,
+            image_url=str(save_path),
+            created_by=(user.id if user else None),
+            industry=None,
+            time_horizon=None,
+            status=status
+        )
+        db.session.add(content)
+        db.session.commit()
+
+        return jsonify({'ok': True, 'filename': filename, 'content': content.to_dict()}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @content_bp.post('/content')
 def content_create_slim():
     try:
