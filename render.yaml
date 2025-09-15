@@ -1,35 +1,38 @@
 services:
+  # Backend (Flask)
   - type: web
     name: rei-backend
-    env: python
+    runtime: python
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: bash -lc 'mkdir -p src/database && exec gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT src.main:app'
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11
-    # Persistente Files für SQLite
+        value: "3.11"
+    # SQLite persistent machen
     disk:
       name: rei-db
       mountPath: /opt/render/project/src/backend/src/database
       sizeGB: 1
     healthCheckPath: /health
 
-  - type: static
+  # Frontend (Vite/React) als Static Site
+  - type: web
     name: rei-frontend
+    runtime: static
     plan: free
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
-    # Frontend bekommt die Backend-URL automatisch als Env-Var
+    # API-URL automatisch vom Backend beziehen (öffentliche URL)
     envVars:
       - key: VITE_API_BASE_URL
         fromService:
-          type: web
           name: rei-backend
-          property: url
-    # SPA-Fallback
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+    # SPA-Fallback für Client-Routing
     routes:
       - type: rewrite
         source: /*
