@@ -5,14 +5,17 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: bash -lc 'mkdir -p src/database && exec gunicorn -w 2 -k gthread -b 0.0.0.0:$PORT src.main:app'
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      # Stelle sicher, dass gunicorn da ist
+      python -c "import pkgutil, sys; sys.exit(0 if pkgutil.find_loader('gunicorn') else 1)" || pip install gunicorn
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT src.main:app
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-    healthCheckPath: /health
 
-  # Frontend (Vite/React) als Static Site — KEIN plan-Feld!
+  # Frontend (Vite/React) als Static Site (kein plan!)
   - type: web
     name: rei-frontend
     runtime: static
@@ -20,12 +23,12 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
-      # Holt die öffentliche URL des Backends als API-Base
+      # Frontend bekommt die Backend-URL automatisch
       - key: VITE_API_BASE_URL
         fromService:
-          name: rei-backend
           type: web
-          envVarKey: RENDER_EXTERNAL_URL
+          name: rei-backend
+          property: url
     # SPA-Fallback für Client-Routing
     routes:
       - type: rewrite
