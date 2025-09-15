@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button.jsx'
+import { Button } from "@/components/ui/button";
 import { Search, Plus, TrendingUp, Lightbulb, Cog, BarChart3, Activity, Menu } from 'lucide-react'
 import { useState } from 'react'
 
