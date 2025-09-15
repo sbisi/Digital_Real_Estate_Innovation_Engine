@@ -24,11 +24,12 @@ services:
     staticPublishPath: dist
     envVars:
       # Frontend bekommt die Backend-URL automatisch
-      - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: rei-backend
-          property: url
+      envVars:
+  - key: VITE_API_BASE_URL
+    fromService:
+      name: rei-backend
+      type: web
+      envVarKey: RENDER_EXTERNAL_URL
     # SPA-Fallback für Client-Routing
     routes:
       - type: rewrite
