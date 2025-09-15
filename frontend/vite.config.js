@@ -21,12 +21,11 @@ export default defineConfig({
   },
   base: './', // Important for deployment
   server: {
-    proxy: {
-      '/api': {
-        target: 'https://rei-backend-mtcr.onrender.com',
-        changeOrigin: true,
-        secure: true
-      }
+  proxy: {
+    '/api': { target: 'http://localhost:5000', changeOrigin: true, secure: false }
+  }
+}
+
     }
   }
 })
