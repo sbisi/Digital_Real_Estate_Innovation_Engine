@@ -12,7 +12,7 @@ services:
     startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT src.main:app
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11"
+        value: "3.11.9"
 
   # Frontend (Vite/React) als Static Site — KEIN plan!
   - type: web
