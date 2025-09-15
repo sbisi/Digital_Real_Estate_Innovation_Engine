@@ -30,6 +30,11 @@ if not db_url:
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+with app.app_context():
+    db.create_all()
+
+
 db.init_app(app)
 with app.app_context():
     # Import all models to ensure they are registered
