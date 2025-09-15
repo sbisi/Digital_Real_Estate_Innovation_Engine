@@ -77,7 +77,8 @@ function parseTags(str) {
 
 // ---------- Seite ----------
 export default function AddConnectPage() {
-  const [tab, setTab] = useState("manual");
+  return <div className="p-6">Add &amp; Connect – Seite</div>;
+}
 
   return (
     <div className="mx-auto max-w-5xl p-6 space-y-6">
