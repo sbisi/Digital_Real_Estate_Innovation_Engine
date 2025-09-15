@@ -1,9 +1,9 @@
 // Updated API Service for Production Backend
 // File: frontend/src/services/api.js
 
-const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://rei-backend-mtcr.onrender.com/api'  // Your live backend URL
-  : 'http://localhost:5000/api'  // Local development
+const ORIGIN = (import.meta.env.VITE_API_BASE_URL || window.location.origin).replace(/\/$/, '');
+const API_BASE_URL = `${ORIGIN}/api`;
+
 
 class ApiService {
   constructor() {
