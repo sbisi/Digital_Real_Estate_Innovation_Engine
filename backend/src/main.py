@@ -1,5 +1,6 @@
 import os
 import sys
+import os, pathlib
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -21,8 +22,14 @@ app.register_blueprint(content_bp, url_prefix='/api')
 app.register_blueprint(trend_bp, url_prefix='/api')
 
 # uncomment if you need to use database
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db_url = os.getenv("DATABASE_URL")
+if not db_url:
+    data_dir = pathlib.Path(os.getenv("DATA_DIR", "/tmp")).resolve()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    db_url = f"sqlite:///{data_dir}/app.db"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 with app.app_context():
     # Import all models to ensure they are registered
