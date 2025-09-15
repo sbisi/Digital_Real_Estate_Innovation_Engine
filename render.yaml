@@ -1,5 +1,4 @@
 services:
-  # Backend (Flask)
   - type: web
     name: rei-backend
     runtime: python
@@ -9,25 +8,11 @@ services:
       pip install --upgrade pip
       pip install -r requirements.txt
       pip install gunicorn
-    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT src.main:app
+    # Für SQLite: genau 1 Worker
+    startCommand: gunicorn -w 1 -b 0.0.0.0:$PORT src.main:app
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
-
-  # Frontend (Vite/React) als Static Site — KEIN plan!
-  - type: web
-    name: rei-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: VITE_API_BASE_URL
-        fromService:
-          name: rei-backend
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+      # sorgt dafür, dass die SQLite-Datei sicher geschrieben werden kann
+      - key: DATA_DIR
+        value: "/tmp"
