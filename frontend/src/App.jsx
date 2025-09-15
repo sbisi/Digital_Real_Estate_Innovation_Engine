@@ -8,6 +8,29 @@ import TrendDashboard from './components/modules/TrendDashboard.jsx'
 import TrendAnalytics from './components/modules/TrendAnalytics.jsx'
 import './App.css'
 
+#AddConnect-Page einbauen
+import React from "react";
+import { Routes, Route, Link } from "react-router-dom";
+import AddConnectPage from "@/pages/AddConnectPage";
+
+function Home() {
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-semibold mb-4">Home</h1>
+      <Link className="underline text-blue-600" to="/add">→ Add & Connect</Link>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/add" element={<AddConnectPage />} />
+    </Routes>
+  );
+}
+
 function App() {
   const [activeModule, setActiveModule] = useState('explore')
 
