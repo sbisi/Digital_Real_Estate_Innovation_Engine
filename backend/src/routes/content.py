@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 content_bp = Blueprint('content', __name__)
 
 # ============================================================
-# NEU: Hilfsfunktion – einfache OpenGraph/Meta-Extraktion
+# Hilfsfunktion – einfache OpenGraph/Meta-Extraktion
 # ============================================================
 def _extract_meta(url: str):
     try:
@@ -46,7 +46,7 @@ def _extract_meta(url: str):
     return {"title": title, "description": desc, "image": image, "site": site}
 
 # ============================================================
-# NEU: /api/content/preview – URL-Vorschau für das Frontend
+# GET /api/content/preview – URL-Vorschau für das Frontend
 # ============================================================
 @content_bp.get('/content/preview')
 def content_preview():
@@ -56,63 +56,10 @@ def content_preview():
     data = _extract_meta(url)
     return jsonify(data), 200
 
-@content_bp.post('/content/upload')
-def content_upload():
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'file missing'}), 400
-        f = request.files['file']
-        if not f.filename:
-            return jsonify({'error': 'empty filename'}), 400
-
-        ctype = (request.form.get('type') or '').strip().lower()
-        if ctype not in {'trend', 'technology', 'inspiration'}:
-            return jsonify({'error': 'invalid type'}), 400
-
-        # Status aus Formular
-        status = (request.form.get('status') or 'draft').strip().lower()
-        if status not in {'draft', 'approved'}:
-            return jsonify({'error': 'invalid status'}), 400
-
-        title = (request.form.get('title') or '').strip()
-        created_by = request.form.get('created_by')
-        user = None
-        if created_by is not None:
-            try:
-                created_by_int = int(created_by)
-                user = User.query.get(created_by_int)
-                if not user:
-                    return jsonify({'error': 'User not found'}), 404
-            except ValueError:
-                return jsonify({'error': 'created_by must be integer'}), 400
-
-        upload_dir = pathlib.Path(os.getenv('DATA_DIR', '/tmp')) / 'uploads'
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        filename = secure_filename(f.filename)
-        save_path = upload_dir / filename
-        f.save(save_path)
-
-        content = Content(
-            title=title or filename,
-            short_description=None,
-            long_description=None,
-            content_type=ctype,
-            image_url=str(save_path),
-            created_by=(user.id if user else None),
-            industry=None,
-            time_horizon=None,
-            status=status
-        )
-        db.session.add(content)
-        db.session.commit()
-
-        return jsonify({'ok': True, 'filename': filename, 'content': content.to_dict()}), 201
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
+# ============================================================
+# POST /api/content – schlanke Create-Route für AddConnectPage
+# nimmt status: draft | approved
+# ============================================================
 @content_bp.post('/content')
 def content_create_slim():
     try:
@@ -123,7 +70,6 @@ def content_create_slim():
         if ctype not in valid_types:
             return jsonify({'error': f'Invalid type. Must be one of {sorted(valid_types)}'}), 400
 
-        # Status: draft | approved
         status = (data.get('status') or 'draft').strip().lower()
         if status not in {'draft', 'approved'}:
             return jsonify({'error': 'invalid status'}), 400
@@ -155,78 +101,9 @@ def content_create_slim():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
 # ============================================================
-# NEU: /api/content – schlanke Create-Route für AddConnectPage
-# Erwartet JSON:
-#   {
-#     "type": "trend|technology|inspiration",
-#     "title": "…",                 (optional bei source_type=url)
-#     "summary": "…",               (optional)
-#     "tags": ["…","…"],            (optional; wird aktuell nicht persistiert)
-#     "source_type": "manual|url",  (optional)
-#     "source_url": "https://…"     (optional)
-#     "image": "https://…"          (optional)
-#     "site": "…"                   (optional)
-#     "created_by": 123             (optional; wenn vorhanden, User wird geprüft)
-#   }
-# Mapped auf Content:
-#   title -> title
-#   summary -> short_description
-#   type -> content_type
-#   image -> image_url
-#   created_by (falls vorhanden/valide)
-#   status -> "draft" (Default)
-# ============================================================
-@content_bp.post('/content')
-def content_create_slim():
-    try:
-        data = request.get_json(force=True, silent=True) or {}
-
-        # Validierung Typ (leichtgewichtiger als /contents)
-        valid_types = {'trend', 'technology', 'inspiration'}
-        ctype = (data.get('type') or '').strip().lower()
-        if ctype not in valid_types:
-            return jsonify({'error': f'Invalid type. Must be one of {sorted(valid_types)}'}), 400
-
-        # created_by optional erlauben (falls Modell non-null ist, gibt DB-Fehler -> wird unten abgefangen)
-        created_by = data.get('created_by')
-        user = None
-        if created_by is not None:
-            user = User.query.get(created_by)
-            if not user:
-                return jsonify({'error': 'User not found'}), 404
-
-        content = Content(
-            title=data.get('title'),
-            short_description=data.get('summary'),
-            long_description=None,  # kann bei Bedarf später gepflegt werden
-            content_type=ctype,
-            image_url=data.get('image'),
-            created_by=created_by if user else None,
-            industry=None,
-            time_horizon=None,
-            status='draft'
-        )
-
-        db.session.add(content)
-        db.session.commit()
-        return jsonify(content.to_dict()), 201
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================================
-# NEU: /api/content/upload – Datei-Upload (multipart/form-data)
-# Erwartet Felder:
-#   file  (Datei)
-#   type  (trend|technology|inspiration)
-#   title (string)
-#   tags  (JSON-Array als String, optional)
-#   created_by (optional)
-# Speichert Datei nach /tmp/uploads und legt optional Content an
-# (ohne echten File-Serve – nur Pfad/Name als Referenz).
+# POST /api/content/upload – Datei-Upload (multipart/form-data)
+# nimmt status: draft | approved
 # ============================================================
 @content_bp.post('/content/upload')
 def content_upload():
@@ -241,6 +118,10 @@ def content_upload():
         valid_types = {'trend', 'technology', 'inspiration'}
         if ctype not in valid_types:
             return jsonify({'error': f'Invalid type. Must be one of {sorted(valid_types)}'}), 400
+
+        status = (request.form.get('status') or 'draft').strip().lower()
+        if status not in {'draft', 'approved'}:
+            return jsonify({'error': 'invalid status'}), 400
 
         title = (request.form.get('title') or '').strip()
         created_by = request.form.get('created_by')
@@ -261,17 +142,16 @@ def content_upload():
         save_path = upload_dir / filename
         f.save(save_path)
 
-        # Optional: Content-Datensatz anlegen (Datei als "image_url" referenzieren – nur Pfad)
         content = Content(
             title=title or filename,
             short_description=None,
             long_description=None,
             content_type=ctype,
-            image_url=str(save_path),  # alternativ: späterer File-Serve/Cloud
+            image_url=str(save_path),  # alternativ späteren File-Serve/Cloud verwenden
             created_by=(user.id if user else None),
             industry=None,
             time_horizon=None,
-            status='draft'
+            status=status
         )
         db.session.add(content)
         db.session.commit()
