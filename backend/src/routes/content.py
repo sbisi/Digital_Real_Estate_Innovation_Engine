@@ -1,9 +1,190 @@
 from flask import Blueprint, request, jsonify
+from werkzeug.utils import secure_filename
 from src.models.user import db, User
 from src.models.content import Content, Rating, Comment, OpportunitySpace
 from datetime import datetime
+import os
+import pathlib
+import re
+
+# Für URL-Preview
+import requests
+from bs4 import BeautifulSoup
 
 content_bp = Blueprint('content', __name__)
+
+# ============================================================
+# NEU: Hilfsfunktion – einfache OpenGraph/Meta-Extraktion
+# ============================================================
+def _extract_meta(url: str):
+    try:
+        resp = requests.get(
+            url,
+            timeout=8,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; REI/1.0)"}
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        return {
+            "title": None,
+            "description": None,
+            "image": None,
+            "site": None,
+            "error": str(e),
+        }
+
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    def meta(name):
+        tag = soup.find("meta", attrs={"property": name}) or soup.find("meta", attrs={"name": name})
+        return tag.get("content") if tag and tag.has_attr("content") else None
+
+    title = meta("og:title") or (soup.title.string.strip() if soup.title and soup.title.string else None)
+    desc = meta("og:description") or meta("description")
+    image = meta("og:image")
+    site = meta("og:site_name")
+    return {"title": title, "description": desc, "image": image, "site": site}
+
+# ============================================================
+# NEU: /api/content/preview – URL-Vorschau für das Frontend
+# ============================================================
+@content_bp.get('/content/preview')
+def content_preview():
+    url = (request.args.get('url') or '').strip()
+    if not url or not re.match(r'^https?://', url):
+        return jsonify({"error": "invalid url"}), 400
+    data = _extract_meta(url)
+    return jsonify(data), 200
+
+# ============================================================
+# NEU: /api/content – schlanke Create-Route für AddConnectPage
+# Erwartet JSON:
+#   {
+#     "type": "trend|technology|inspiration",
+#     "title": "…",                 (optional bei source_type=url)
+#     "summary": "…",               (optional)
+#     "tags": ["…","…"],            (optional; wird aktuell nicht persistiert)
+#     "source_type": "manual|url",  (optional)
+#     "source_url": "https://…"     (optional)
+#     "image": "https://…"          (optional)
+#     "site": "…"                   (optional)
+#     "created_by": 123             (optional; wenn vorhanden, User wird geprüft)
+#   }
+# Mapped auf Content:
+#   title -> title
+#   summary -> short_description
+#   type -> content_type
+#   image -> image_url
+#   created_by (falls vorhanden/valide)
+#   status -> "draft" (Default)
+# ============================================================
+@content_bp.post('/content')
+def content_create_slim():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+
+        # Validierung Typ (leichtgewichtiger als /contents)
+        valid_types = {'trend', 'technology', 'inspiration'}
+        ctype = (data.get('type') or '').strip().lower()
+        if ctype not in valid_types:
+            return jsonify({'error': f'Invalid type. Must be one of {sorted(valid_types)}'}), 400
+
+        # created_by optional erlauben (falls Modell non-null ist, gibt DB-Fehler -> wird unten abgefangen)
+        created_by = data.get('created_by')
+        user = None
+        if created_by is not None:
+            user = User.query.get(created_by)
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+        content = Content(
+            title=data.get('title'),
+            short_description=data.get('summary'),
+            long_description=None,  # kann bei Bedarf später gepflegt werden
+            content_type=ctype,
+            image_url=data.get('image'),
+            created_by=created_by if user else None,
+            industry=None,
+            time_horizon=None,
+            status='draft'
+        )
+
+        db.session.add(content)
+        db.session.commit()
+        return jsonify(content.to_dict()), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# NEU: /api/content/upload – Datei-Upload (multipart/form-data)
+# Erwartet Felder:
+#   file  (Datei)
+#   type  (trend|technology|inspiration)
+#   title (string)
+#   tags  (JSON-Array als String, optional)
+#   created_by (optional)
+# Speichert Datei nach /tmp/uploads und legt optional Content an
+# (ohne echten File-Serve – nur Pfad/Name als Referenz).
+# ============================================================
+@content_bp.post('/content/upload')
+def content_upload():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'file missing'}), 400
+        f = request.files['file']
+        if not f.filename:
+            return jsonify({'error': 'empty filename'}), 400
+
+        ctype = (request.form.get('type') or '').strip().lower()
+        valid_types = {'trend', 'technology', 'inspiration'}
+        if ctype not in valid_types:
+            return jsonify({'error': f'Invalid type. Must be one of {sorted(valid_types)}'}), 400
+
+        title = (request.form.get('title') or '').strip()
+        created_by = request.form.get('created_by')
+        user = None
+        if created_by is not None:
+            try:
+                created_by_int = int(created_by)
+                user = User.query.get(created_by_int)
+                if not user:
+                    return jsonify({'error': 'User not found'}), 404
+            except ValueError:
+                return jsonify({'error': 'created_by must be integer'}), 400
+
+        # Datei speichern – Render: /tmp ist beschreibbar
+        upload_dir = pathlib.Path(os.getenv('DATA_DIR', '/tmp')) / 'uploads'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        filename = secure_filename(f.filename)
+        save_path = upload_dir / filename
+        f.save(save_path)
+
+        # Optional: Content-Datensatz anlegen (Datei als "image_url" referenzieren – nur Pfad)
+        content = Content(
+            title=title or filename,
+            short_description=None,
+            long_description=None,
+            content_type=ctype,
+            image_url=str(save_path),  # alternativ: späterer File-Serve/Cloud
+            created_by=(user.id if user else None),
+            industry=None,
+            time_horizon=None,
+            status='draft'
+        )
+        db.session.add(content)
+        db.session.commit()
+
+        return jsonify({'ok': True, 'filename': filename, 'content': content.to_dict()}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================
+# BESTEHENDE Routen (unverändert)
+# ============================================================
 
 @content_bp.route('/contents', methods=['GET'])
 def get_contents():
@@ -285,4 +466,3 @@ def get_stats():
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
