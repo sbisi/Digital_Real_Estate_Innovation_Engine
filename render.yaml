@@ -8,14 +8,13 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
-      # Stelle sicher, dass gunicorn da ist
-      python -c "import pkgutil, sys; sys.exit(0 if pkgutil.find_loader('gunicorn') else 1)" || pip install gunicorn
+      pip install gunicorn
     startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT src.main:app
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
 
-  # Frontend (Vite/React) als Static Site (kein plan!)
+  # Frontend (Vite/React) als Static Site — KEIN plan!
   - type: web
     name: rei-frontend
     runtime: static
@@ -23,14 +22,11 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
-      # Frontend bekommt die Backend-URL automatisch
-      envVars:
-  - key: VITE_API_BASE_URL
-    fromService:
-      name: rei-backend
-      type: web
-      envVarKey: RENDER_EXTERNAL_URL
-    # SPA-Fallback für Client-Routing
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: rei-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
     routes:
       - type: rewrite
         source: /*
