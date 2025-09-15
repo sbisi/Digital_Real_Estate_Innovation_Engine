@@ -8,7 +8,7 @@ import TrendDashboard from './components/modules/TrendDashboard.jsx'
 import TrendAnalytics from './components/modules/TrendAnalytics.jsx'
 import './App.css'
 
-#AddConnect-Page einbauen
+// AddConnect-Page einbauen
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import AddConnectPage from "@/pages/AddConnectPage";
